@@ -1,0 +1,12 @@
+dbname: testDB
+dbuser: pguser
+dbpassword: pgpass
+dbhost: postgreshost.example.com
+dbport: 5432
+sslmode: disable
+rabbithost: rabbit.example.com
+rabbitport: 61613
+rabbitvhost: testVHost
+rabbitqueue: /queue/userwork
+rabbituser: guest
+rabbitpassword: guest

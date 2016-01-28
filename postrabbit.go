@@ -11,16 +11,26 @@ import (
 
 // Config contains various config data populated from YAML
 type Config struct {
-	PostgresURL string
-	RabbitMQURL string
+	DbName         string
+	DbUser         string
+	DbPassword     string
+	DbHost         string
+	DbPort         string
+	SslMode        string
+	RabbitHost     string
+	RabbitPort     string
+	RabbitVHost    string
+	RabbitQueue    string
+	RabbitUser     string
+	RabbitPassword string
 }
 
 var (
-	app          = kingpin.New("postrabbit", "A PostgreSQL/RabbitMQ Example")
-	setupcommand = app.Command("setup", "setup the database for the example")
-	runcommand   = app.Command("run", "run the listener")
-	addcommand   = app.Command("add", "add a URL to the table")
-	urlarg       = addcommand.Arg("url", "url to add").String()
+	app            = kingpin.New("postrabbit", "A PostgreSQL/RabbitMQ Example")
+	setupcommand   = app.Command("setup", "setup the database for the example")
+	runcommand     = app.Command("run", "run the listener")
+	addcommand     = app.Command("add", "add a URL to the table")
+	consumecommand = app.Command("consume", "consume data")
 )
 
 func main() {
@@ -30,7 +40,6 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to read creds")
 	}
-
 	err = yaml.Unmarshal(filebytes, &config)
 	if err != nil {
 		log.Fatal("Failed to parse creds", err)
@@ -43,5 +52,8 @@ func main() {
 		run(config)
 	case addcommand.FullCommand():
 		add(config)
+	case consumecommand.FullCommand():
+		consume(config)
+
 	}
 }

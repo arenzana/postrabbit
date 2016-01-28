@@ -1,12 +1,12 @@
 package main
 
 import (
-	"crypto/tls"
+	"fmt"
 	"log"
 	"time"
 
+	"github.com/go-stomp/stomp"
 	pq "github.com/lib/pq"
-	"github.com/streadway/amqp"
 )
 
 func errorReporter(ev pq.ListenerEventType, err error) {
@@ -16,36 +16,34 @@ func errorReporter(ev pq.ListenerEventType, err error) {
 }
 
 func run(config Config) {
-	listener := pq.NewListener(config.PostgresURL, 10*time.Second, time.Minute, errorReporter)
-	err := listener.Listen("urlwork")
+	purl := fmt.Sprintf("user=%s password=%s host=%s port=%s dbname=%s sslmode=%s", config.DbUser, config.DbPassword, config.DbHost, config.DbPort, config.DbName, config.SslMode)
+	listener := pq.NewListener(purl, 10*time.Second, time.Minute, errorReporter)
+	err := listener.Listen("usertrigger")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	rabbitchannel := make(chan string, 100)
 
+	//Code for STOMP
 	go func() {
-		cfg := new(tls.Config)
-		cfg.InsecureSkipVerify = true
-		conn, err := amqp.DialTLS(config.RabbitMQURL, cfg)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer conn.Close()
+		rabbitHost := fmt.Sprintf("%s:%s", config.RabbitHost, config.RabbitPort)
+		conn, err := stomp.Dial("tcp", rabbitHost,
+			stomp.ConnOpt.Login(config.RabbitUser, config.RabbitPassword),
+			stomp.ConnOpt.AcceptVersion(stomp.V11),
+			stomp.ConnOpt.AcceptVersion(stomp.V12),
+			stomp.ConnOpt.Host(config.RabbitVHost),
+			stomp.ConnOpt.Header("nonce", "B256B26D320A"))
 
-		ch, err := conn.Channel()
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer ch.Close()
+		defer conn.Disconnect()
 
 		for {
 			payload := <-rabbitchannel
 			log.Println(payload)
-			err := ch.Publish("urlwork", "todo", false, false, amqp.Publishing{
-				ContentType: "text/plain",
-				Body:        []byte(payload),
-			})
+			err = conn.Send(config.RabbitQueue, "text/plain", []byte(payload))
 			if err != nil {
 				log.Fatal(err)
 			}
